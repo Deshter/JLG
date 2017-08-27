@@ -57,6 +57,11 @@ class Player(pygame.sprite.Sprite):
         if self.rect.top < 0:
             self.rect.top = 0
 
+    def shoot(self):
+        bullet = Bullet(self.rect.centerx, self.rect.top)
+        all_sprites.add(bullet)
+        bullets.add(bullet)
+
 class Mob(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
@@ -76,8 +81,25 @@ class Mob(pygame.sprite.Sprite):
             self.rect.y = random.randrange(-100, -40)
             self.speedy = random.randrange(1, 16)
 
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface((5, 20))
+        self.image.fill(YELLOW)
+        self.rect = self.image.get_rect()
+        self.rect.bottom = y
+        self.rect.centerx = x
+        self.speedy = -10
+
+    def update(self):
+        self.rect.y += self.speedy
+        #if it reaches offscreen it dies
+        if self.rect.bottom < 0:
+            self.kill()
+
 all_sprites = pygame.sprite.Group()
 mobs = pygame.sprite.Group()
+bullets = pygame.sprite.Group()
 player = Player()
 all_sprites.add(player)
 for i in range(8):
@@ -96,6 +118,9 @@ while running:
         #Check for closing window
         if event.type == pygame.QUIT:
                 running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                player.shoot()
 
     # Update
     all_sprites.update()
@@ -105,6 +130,11 @@ while running:
         player.life -= 1
         mercy = True
         collision_time = pygame.time.get_ticks()
+    hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
+    for hit in hits:
+        m = Mob()
+        all_sprites.add(m)
+        mobs.add(m)
 
     if mercy == True:
         player.image.fill(WHITE)
@@ -114,6 +144,7 @@ while running:
 
     if player.life <= 0:
         player.image.fill(BLACK)
+        running = False
 
     #draw
     screen.fill (BLACK)
