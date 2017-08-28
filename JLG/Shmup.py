@@ -23,6 +23,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Shmoop")
 clock = pygame.time.Clock()
 collision_time = 0
+shoot_delay = 0
 mercy = False
 
 class Player(pygame.sprite.Sprite):
@@ -31,11 +32,13 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.transform.scale (player_img, (50, 38))
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
+        self.radius = 15
         self.rect.centerx = WIDTH / 2
         self.rect.bottom = HEIGHT - 10
         self.speedx = 0
         self.speedy = 0
         self.life = 3
+        self.shootspeed = 100
 
     def update(self):
         self.speedx = 0
@@ -74,15 +77,32 @@ class Player(pygame.sprite.Sprite):
 class Mob(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.transform.scale (meteor_img, (40, 40))
-        self.image.set_colorkey(BLACK)
+        self.image_orig = pygame.transform.scale(meteor_img, (40, 40))
+        self.image_orig.set_colorkey(BLACK)
+        self.image = self.image_orig.copy()
         self.rect = self.image.get_rect()
+        self.radius = int(self.rect.width * .85 / 2)
         self.rect.x = random.randrange(WIDTH - self.rect.width)
         self.rect.y = random.randrange(-100, -40)
         self.speedy = random.randrange(1, 5)
         self.speedx = random.randrange(-5, 5)
+        self.rot_speed = random.randrange(-8, 8)
+        self.rot = 0
+        self.last_update = pygame.time.get_ticks()
+
+    def rotate(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_update > 50:
+            self.last_update = now
+            self.rot = (self.rot + self.rot_speed) % 360
+            new_image = pygame.transform.rotate(self.image_orig, self.rot)
+            old_center = self.rect.center
+            self.image = new_image
+            self.rect = self.image.get_rect()
+            self.rect.center = old_center
 
     def update(self):
+        self.rotate()
         self.rect.x += self.speedx
         self.rect.y += self.speedy
         if self.rect.top > HEIGHT + 10 or self.rect.left < -25 or self.rect.right > WIDTH + 20:
@@ -134,14 +154,18 @@ while running:
         #Check for closing window
         if event.type == pygame.QUIT:
                 running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                player.shoot()
+        #elif event.type == pygame.KEYDOWN:
+            #if event.key == pygame.K_SPACE:
+                #player.shoot()
+    pressed = pygame.key.get_pressed()
+    if pressed[pygame.K_SPACE] and pygame.time.get_ticks() - shoot_delay > player.shootspeed:
+        player.shoot()
+        shoot_delay = pygame.time.get_ticks()
 
     # Update
     all_sprites.update()
     #Check to see if a mob hit the player
-    hits = pygame.sprite.spritecollide(player, mobs, False)
+    hits = pygame.sprite.spritecollide(player, mobs, False, pygame.sprite.collide_circle)
     if hits and mercy == False:
         player.life -= 1
         mercy = True
