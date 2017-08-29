@@ -1,8 +1,11 @@
+# Frozen Jam by tgfcoder <https://twitter.com/tgfcoder> licensed under CC-BY-3
+# Art from Kenney.nl
 import pygame
 import random
 from os import path
 
-img_dir = path.join(path.dirname(__file__), "img")
+img_dir = path.join(path.dirname(__file__), 'img')
+snd_dir = path.join(path.dirname(__file__), 'snd')
 
 #Starting by setting up the screen dimensions
 WIDTH = 480
@@ -25,6 +28,14 @@ clock = pygame.time.Clock()
 collision_time = 0
 shoot_delay = 0
 mercy = False
+
+font_name = pygame.font.match_font('arial')
+def draw_text(surf, text, size, x, y):
+    font = pygame.font.Font(font_name, size)
+    text_surface = font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect()
+    text_rect.midtop = (x, y)
+    surf.blit(text_surface, text_rect)
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -73,11 +84,12 @@ class Player(pygame.sprite.Sprite):
         bullet = Bullet(self.rect.centerx, self.rect.top)
         all_sprites.add(bullet)
         bullets.add(bullet)
+        shoot_sound.play()
 
 class Mob(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
-        self.image_orig = pygame.transform.scale(meteor_img, (40, 40))
+        self.image_orig = random.choice(meteor_images)
         self.image_orig.set_colorkey(BLACK)
         self.image = self.image_orig.copy()
         self.rect = self.image.get_rect()
@@ -89,6 +101,8 @@ class Mob(pygame.sprite.Sprite):
         self.rot_speed = random.randrange(-8, 8)
         self.rot = 0
         self.last_update = pygame.time.get_ticks()
+        self.maxhealth = int (self.rect.width / 10)
+        self.health = self.maxhealth
 
     def rotate(self):
         now = pygame.time.get_ticks()
@@ -105,10 +119,12 @@ class Mob(pygame.sprite.Sprite):
         self.rotate()
         self.rect.x += self.speedx
         self.rect.y += self.speedy
-        if self.rect.top > HEIGHT + 10 or self.rect.left < -25 or self.rect.right > WIDTH + 20:
+        if self.rect.top > HEIGHT + 10 or self.rect.left < -30 or self.rect.right > WIDTH + 30:
             self.rect.x = random.randrange(WIDTH - self.rect.width)
             self.rect.y = random.randrange(-100, -40)
             self.speedy = random.randrange(1, 16)
+        if self.health <= 0:
+            self.kill
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -125,13 +141,30 @@ class Bullet(pygame.sprite.Sprite):
         #if it reaches offscreen it dies
         if self.rect.bottom < 0:
             self.kill()
+
+
 #Load game assets
 background = pygame.image.load(path.join(img_dir, 'starfield.png')).convert()
 background_rect = background.get_rect()
 player_img = pygame.image.load(path.join(img_dir, 'playerShip1_orange.png')).convert()
 hurt_img = pygame.image.load(path.join(img_dir, 'playerShip1_hurt.png')).convert()
-meteor_img = pygame.image.load(path.join(img_dir, 'meteorBrown_med1.png')).convert()
 bullet_img = pygame.image.load(path.join(img_dir, 'laserRed16.png')).convert()
+meteor_images = []
+meteor_list = ['meteorBrown_big1.png','meteorBrown_med1.png',
+              'meteorBrown_med1.png','meteorBrown_med3.png',
+              'meteorBrown_small1.png','meteorBrown_small2.png',
+              'meteorBrown_tiny1.png']
+for img in meteor_list:
+    meteor_images.append(pygame.image.load(path.join(img_dir, img)).convert())
+#sounds
+shoot_sound = pygame.mixer.Sound(path.join(snd_dir, 'pew.wav'))
+expl_sounds = []
+for snd in ['expl3.wav', 'expl6.wav']:
+    expl_sounds.append(pygame.mixer.Sound(path.join(snd_dir, snd)))
+pygame.mixer.music.load(path.join(snd_dir,'tgfcoder-FrozenJam-SeamlessLoop.ogg'))
+pygame.mixer.music.set_volume(0.4)
+
+
 
 all_sprites = pygame.sprite.Group()
 mobs = pygame.sprite.Group()
@@ -142,7 +175,8 @@ for i in range(8):
     m = Mob()
     all_sprites.add(m)
     mobs.add(m)
-
+score = 0
+pygame.mixer.music.play(loops=-1)
 # Game loop
 running = True
 
@@ -170,24 +204,38 @@ while running:
         player.life -= 1
         mercy = True
         collision_time = pygame.time.get_ticks()
-    hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
+    hits = pygame.sprite.groupcollide(mobs, bullets, False, True)
     for hit in hits:
-        m = Mob()
-        all_sprites.add(m)
-        mobs.add(m)
+        hit.health -= 1
+        if hit.health <= 0:
+            hit.kill()
+            random.choice(expl_sounds).play()
+            score += int(round(hit.maxhealth) * 10)
+            m = Mob()
+            all_sprites.add(m)
+            mobs.add(m)
+
+
 
     if mercy == True:
         if pygame.time.get_ticks() - collision_time > 3000:
             mercy = False
 
+#    if Mob.health <= 0:
+#        Mob.kill
+#        m = Mob()
+#        all_sprites.add(m)
+#        mobs.add(m)
+
     if player.life <= 0:
-        player.image.fill(BLACK)
+        player.kill
         running = False
 
     #draw
     screen.fill (BLACK)
     screen.blit(background, background_rect)
     all_sprites.draw(screen)
+    draw_text(screen, str(score), 18, WIDTH / 2, 10)
     #lastly, renew the screenpygame.display.flip()
     pygame.display.flip()
 
